@@ -1,49 +1,95 @@
-# latex4bitbucket
-Dockerfile for latex4bitbucket image: Ubuntu image with **texlive** and **gdcp** (google drive copy).
+# latex-pipeline-builder
+Dockerfile for latex pipeline, uses Ubuntu image with **texlive-full** (because I'm not going to manage all the packages myself :).
 
 Intended to use from bitbucket pipeline to automate build for latex projects.
 
-Since bitbucket pipeline does not keep artifacts, this image includes gdcp to be able to automatically copy the generated files to a Google Drive folder.
+Since bitbucket pipeline does not keep artifacts, you can use this image to generate your pdf files and then commit them to your repo.
 
-The docker image is available here: https://hub.docker.com/r/vvirag/latex4bitbucket/
+The docker image is available here: https://hub.docker.com/r/botenvouwer/latex-pipeline-builder
 
-## Prerequisite: setup gdcp on your local system
-To generate and setup the necessary credentials to reach Google Drive, first you have to generate these on your local machine.
+This image gives you the default latex commands to compile tex files. But I also included my own bash script (see next section) to make things easy.
 
-1. Go and follow the installation steps at https://github.com/ctberthiaume/gdcp
-1. Go to your Google Drive, and select the folder you want to use
-1. Right click and select `Get shareable link..`. In the pop up window you can see the Google Drive ID of the given directory, something like that: `https://drive.google.com/open?id=xxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-1. You need this ID later to be able to use gdcp.
-1. Continue with the setup steps at https://github.com/ctberthiaume/gdcp
+## How to use latex-builder
+ This builder starts a pdf build based on tagname.
+ 
+ A tagname should follow these rules "[tex file]-[version]".
+ Tagname example: "mythesis-v1.1".
+ ```
+ [tex file] -> The name of the .tex file. The script looks in 
+               local directory and in subdirectory like 
+               "./mythesis.tex" and "./mythesis/mythesis.tex".
+               
+               If you have multiple dashes "-" in your
+               tagname, the script will look for spaces and
+               dashes. Example:
 
-## Setup bitbucket pipeline
-The goal is to setup an automated build system for a latex project that not only compiles latex, but also copies the generated output to a given Google Drive folder. The example configuration below generates a `build-YYYYmmDD_HHMMSS` subfolder under the remote Google Drive folder, and copies there the generated `.pdf`, `.log`, and `.bbl` files.
+               Tagname: "my-thesis-v0.1"
 
-1. Enable pipeline on your bitbucket project
-1. Example pipeline configuration:
+               Script will look for:
+               "./my thesis.tex", "./my-thesis.tex", "./my thesis/my thesis.tex", "my-thesis/my-thesis.tex"
+               
+               Note that: search is capital sensitive!
+ ```
+
+ ```
+ [version] ->  The version of your .tex file. This will be 
+               used to suffix the resulting pdf. The script 
+               also adds a latex command to the tex file like
+               "\newcommand{\PipelineBuildVersion}{v1.1}" 
+               which you can use to show the version inside
+               your document. 
+               Use the following code to use version number
+               safely in your tex document:
+              
+               %Put this in top of your latex file before you use the bellow command
+               \ifx\PipelineBuildVersion\undefined
+                   \newcommand{\YourVersion}{Latest}
+               \else
+                   \newcommand{\YourVersion}{\PipelineBuildVersion}
+               \fi
+
+               %Use this command where ever you want to use the version number
+               \YourVersion
 ```
-image: vvirag/latex4bitbucket
+
+## Setup example for bitbucket pipeline
+You can create a pdf for every tag you create or push. Setup a `bitbuckit-pipelines.yml` file in the root of your repo. And add this content:
+
+```
+image: botenvouwer/latex-pipeline-builder
+pipelines:
+  tags:
+   '*':
+      - step:
+          name: Compile tex file and commit to repo
+          script:
+            - latex-builder "${BITBUCKET_TAG}"
+            - git add -f '*.pdf'
+            - git commit -m "Auto publish ${BITBUCKET_TAG}"
+            - git push origin HEAD:master
+```
+
+In the above example the tagname is passed using `"${BITBUCKET_TAG}"` as argument. You should name your tag something like `myfile-v0.3` to build myfile.tex into myfile-v0.3.pdf. You could however fill in something else. Some examples:
+
+Statically create file on every push to master:
+
+```
+image: botenvouwer/latex-pipeline-builder
 pipelines:
   default:
     - step:
-        script:
-          - set +e
-          - latexmk -cd -e '$$pdflatex="pdflatex -interaction=nonstopmode %S %O"' -f -pdf main.tex
-          - echo "Compiling done!"
-          - echo $GDCP_CLIENT_SECRETS > /root/.gdcp/client_secrets.json
-          - echo $GDCP_CREDENTIALS > /root/.gdcp/credentials.json
-          - dirname="build-"$(date +"%Y%m%d_%H%M%S")
-          - mkdir $dirname
-          - cp *.pdf $dirname/
-          - cp *.log $dirname/
-          - cp *.bbl $dirname/
-          - gdcp upload -p $GDCP_FOLDER ./$dirname
-          - echo "Publishing on Google Drive done!"
+       script:
+        - latex-builder "myfile-latest"
 ```
-1. On bitbucket, go for `Settings/Pipeline/Environment variables`
-1. Add two variables with the name of `GDCP_CLIENT_SECRETS` and `GDCP_CREDENTIALS`. Copy the content of your local `~/.gdcp/client_secrets.json` and `~/.gdcp/credentials.json` files (generated during the **Prerequisite: setup gdcp on your local system** step earlier in this description.) into the value fields.
-1. Add `GDCP_FOLDER` variable. The value should be the Google Drive folder ID that was noted during the **Prerequisite: setup gdcp on your local system** step earlier in this description.
 
+Use branch name as filename to create latest version for specific file. Note that you need to name your branches like your tex files without '.tex':
 
-You're all good now. At each `git push` on your bitbucket project, this pipeline is automatically invoked: it will try to compile your latex files, and then copies the outputs (`.pdf`, `.log`, `.bbl`) to the configured remote Google Drive folder, under a timestamped build subdirectory.
+```
+image: botenvouwer/latex-pipeline-builder
+pipelines:
+  default:
+    - step:
+       script:
+        - latex-builder "$BITBUCKET_BRANCH-latest"
+```
 
