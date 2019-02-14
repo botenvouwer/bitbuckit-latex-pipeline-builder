@@ -1,0 +1,30 @@
+\documentclass[a4paper]{article}
+\usepackage{fancyhdr}
+\usepackage[utf8]{inputenc}
+\usepackage{blindtext}
+
+%Version number if present
+\ifx\PipelineBuildVersion\undefined
+    \newcommand{\YourVersion}{Latest}
+\else
+    \newcommand{\YourVersion}{\PipelineBuildVersion}
+\fi
+
+% Page header
+\fancyhf{}% Clear all headers/footers
+\fancyfoot[C]{\thepage}
+\fancyfoot[R]{\YourVersion\relax}
+
+\pagestyle{fancy}
+\thispagestyle{plain}
+
+\begin{document}
+
+\section{Front of document}
+This is version: \YourVersion
+
+\newpage
+\section{Test 2}
+\blindtext
+
+\end{document}

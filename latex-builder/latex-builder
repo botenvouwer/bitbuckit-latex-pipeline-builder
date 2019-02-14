@@ -1,0 +1,94 @@
+#!/bin/bash
+# Latex builder used for pipeline build
+# This builder starts a pdf build based on tagname
+# 
+# A tagname should follow these rules "[tex file]-[version]"
+# Tagname example: "mythesis-v1.1"
+# 
+# [tex file] -> The name of the .tex file. The script looks in 
+#               local directory and in subdirectory like 
+#               "./mythesis.tex" and "./mythesis/mythesis.tex".
+#               
+#               If you have multiple dashes "-" in your
+#               tagname, the script will look for spaces and
+#               dashes. Example:
+#
+#               Tagname: "my-thesis-v0.1"
+#
+#               Script will look for:
+#               "./my thesis.tex", "./my-thesis.tex", "./my thesis/my thesis.tex", "my-thesis/my-thesis.tex"
+#               
+#               Note that: search is capital sensitive!
+# 
+# [version] ->  The version of your .tex file. This will be 
+#               used to suffix the resulting pdf. The script 
+#               also adds a latex command to the tex file like
+#               "\newcommand{\PipelineBuildVersion}{v1.1}" 
+#               which you can use to show the version inside
+#               your document. 
+#               Use the following code to use version number
+#               safely in your tex document:
+#              
+#               %Put this in top of your latex file before you use the bellow command
+#               \ifx\PipelineBuildVersion\undefined
+#                   \newcommand{\YourVersion}{Latest}
+#               \else
+#                   \newcommand{\YourVersion}{\PipelineBuildVersion}
+#               \fi
+#
+#               %Use this command where ever you want to use the version number
+#               \YourVersion
+
+doLatexBuildIfFound () { 
+  echo "Looking for: $1"
+
+  goBackHere="$PWD"
+
+  if [ -d "$1" ]; then
+    echo "Found in directory"
+    cd "$1"
+  fi
+
+  if [ -f "$1.tex" ]; then
+    echo "Found tex -> compiling $1-$2.pdf"
+    targetFile="$1-$2.tex"
+    
+    echo "\newcommand{\PipelineBuildVersion}{$2}" | cat - "$1.tex" > $targetFile
+
+    #Do the actual latex build
+    latexmk -cd -e '$$pdflatex="pdflatex -interaction=nonstopmode %S %O"' -f -pdf "${targetFile}"
+
+    echo "Generated: $1-$2.pdf"
+  fi
+
+  cd "$goBackHere"
+}
+
+echo "Starting texbuild.."
+
+if [ -z ${1+x} ]; 
+  then 
+    (>&2 echo "Needs one argument -> example: latex-builder mythesis-v1.1") 
+  else 
+    echo "Tag found ['$1'] -> run tag build"
+    
+    #explode tag on '-' to separate [tex file] and [version]
+    IFS='-' read -r -a tagexpl <<< "$1"
+    
+    version=${tagexpl[-1]}
+    texfileSpace="${tagexpl[@]/${tagexpl[-1]}}"
+    texfileSpace="$(sed -e 's/[[:space:]]*$//' <<<${texfileSpace})"
+    texfileDash=$(echo ${texfileSpace} | tr ' ' -)
+
+    searchLocations[0]="${texfileSpace}"
+    searchLocations[1]="${texfileDash}"
+
+    echo ""
+    echo "Set version: $version"
+    
+    for i in "${searchLocations[@]}"; do
+      doLatexBuildIfFound "$i" $version
+    done
+  fi
+
+

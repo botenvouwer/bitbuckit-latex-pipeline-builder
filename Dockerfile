@@ -20,3 +20,7 @@ RUN mkdir /lib/latex-builder
 # Install latex builder that will do the latex building
 COPY latex-builder/. /lib/latex-builder
 
+RUN echo "export PATH=/lib/latex-builder:\$PATH" >> $HOME/.bashrc
+
+RUN  chmod -R 777 /lib/latex-builder
+
