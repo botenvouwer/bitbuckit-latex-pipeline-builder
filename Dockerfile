@@ -14,3 +14,9 @@ RUN apt-get remove --quiet --yes "texlive-*-doc"
 # install some additional tools    
 RUN apt-get install -qy make latexmk git
 
+# make directories
+RUN mkdir /lib/latex-builder
+
+# Install latex builder that will do the latex building
+COPY latex-builder/. /lib/latex-builder
+
