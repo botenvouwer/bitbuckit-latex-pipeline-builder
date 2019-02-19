@@ -47,10 +47,6 @@ for tag in repo.tags:
 
             os.system('git checkout tags/'+tag)
 
-            #Todo: use save method -> command line injection not secured
-            #os.system('git branch %s' % tagFile)
-            #os.system('git checkout %s' % tagFile)
-
             cwd = os.getcwd()
 
             if filename[2] is not '':
