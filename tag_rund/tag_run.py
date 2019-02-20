@@ -2,8 +2,8 @@ import sys
 import os
 from shutil import copyfile
 from git import Repo
-from tag_rund.tag_helper import *
-from tag_rund.tex_helper import *
+from tag_helper import *
+from tex_helper import *
 
 repoPath = sys.argv[1]
 ext = 'tex'
@@ -12,21 +12,34 @@ os.chdir(repoPath)
 
 # Fix for bitbuckit pipeline -> is necessary for tag trigger
 os.system('git config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"')
-os.system('git fetch')
+os.system('git fetch origin')
+
+print('')
+print('Branches')
+os.system('git branch')
+print('')
 
 os.system('git checkout master')
-os.system('git pull')
+os.system('git pull origin master')
 
 repo = Repo('./')
 
-if 'publish' not in repo.branches:
+if 'origin/publish' not in repo.refs:
     os.system('git branch publish')
 
 os.system('git checkout publish')
-os.system('git pull')
+os.system('git pull origin publish')
 os.system('git merge --strategy-option=theirs master')
 
+print('')
+print('current state')
+os.system('ls')
+
+print('')
+os.system('git status')
+
 doneList = []
+doneNotList = []
 
 for tag in repo.tags:
     tag = str(tag)
@@ -38,37 +51,54 @@ for tag in repo.tags:
         filenames = tagl[1:]
         filename = checkIfSourceFileExists(filenames, ext)
 
-        if filename != False and checkIfVersionExists(filenames, version, 'pdf'):
-            print(version)
-            print(filename)
-            print(tag)
+        if filename != False:
 
-            tagFile = tag + '.' + ext
+            pdfInPlace = checkIfVersionExists(filenames, version, 'pdf')
 
-            os.system('git checkout tags/'+tag)
+            if pdfInPlace == False:
+                print(version)
+                print(filename)
+                print(tag)
 
-            cwd = os.getcwd()
+                tagFile = tag + '.' + ext
 
-            if filename[2] is not '':
-                os.chdir(filename[2])
+                os.system('git checkout tags/' + tag)
 
-            copyfile(filename[1], tagFile)
-            addVersion(tagFile, version)
-            generateLatexFile(tagFile)
-            os.remove(tagFile)
+                cwd = os.getcwd()
 
-            doneList.append("%s -> %s" % (tag, tagFile))
+                if filename[2] is not '':
+                    os.chdir(filename[2])
 
-            os.chdir(cwd)
+                copyfile(filename[1], tagFile)
+                addVersion(tagFile, version)
+                generateLatexFile(tagFile)
+                os.remove(tagFile)
 
-            os.system('git checkout publish')
-            os.system('git add -f *.pdf')
-            os.system('git commit -m "Robot build for tag: %s"' % tag)
-            os.system('git clean -f')
-            os.system('git push origin publish')
+                doneList.append("%s -> %s" % (tag, tagFile))
 
+                os.chdir(cwd)
+
+                os.system('git checkout publish')
+                os.system('git add -f *.pdf')
+                os.system('git commit -m "Robot build for tag: %s"' % tag)
+                os.system('git clean -f')
+                os.system('git push origin publish')
+            else:
+                print("Skip ")
+                doneNotList.append("%s -> pdf already in place" % (tag))
+        else:
+            print("Skip ")
+            doneNotList.append("%s -> tex file not in master" % (tag))
+
+print("")
 print("Generated %s versions" % len(doneList))
 print("")
 for done in doneList:
     print(done)
+
+print("")
+print("Skipped %s versions" % len(doneNotList))
+print("")
+for doneNot in doneNotList:
+    print(doneNot)
 

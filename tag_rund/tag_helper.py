@@ -5,9 +5,9 @@ def parseTag(tag, seperator='-'):
     list = tag.split(seperator)
     version = list.pop()
     tag = seperator.join(list)
-    tagSpace = ' '.join(list)
+    tag2 = ' '.join(list)
 
-    return (version, tag, tagSpace)
+    return (version, tag, tag2)
 
 
 def validateTag(tag, seperator='-'):
@@ -29,7 +29,7 @@ def checkIfVersionExists(tag, version, extention='pdf'):
     for f in tag:
         for filename in glob.glob('**/'+f+'-'+version+'.'+extention, recursive=True):
             if os.path.isfile(filename):  # filter dirs
-                return False
+                return True
 
-    return True
+    return False
 
